@@ -2,7 +2,7 @@ SRC:=$(wildcard *.cpp)
 OBJ:=$(SRC:.cpp=.o)
 
 CFLAGS:=
-CXXFLAGS:=-O3 -ggdb $(shell pkg-config opencv --cflags)
+CXXFLAGS:=-O0 -ggdb $(shell pkg-config opencv --cflags)
 LDFLAGS:=$(shell pkg-config opencv --libs --cflags)
 
 CC:=gcc

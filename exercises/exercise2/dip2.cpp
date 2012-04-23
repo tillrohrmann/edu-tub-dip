@@ -23,9 +23,7 @@ void adaptiveFilter(Mat& src, Mat& dst, int kSize, double threshold);
 void noiseReduction(Mat&, Mat&, const char*, int, int=0);
 void generateNoisyImages(Mat&);
 
-void quicksort(float* data, int left, int right);
 void flip(Mat& src, Mat &dst);
-void mergeMats(Mat& src1, Mat& src2, Mat& mask, Mat& dst);
 
 const int REF_KERNELSIZE=3;
 
@@ -98,11 +96,14 @@ int main(int argc, char** argv) {
 	  cout << "done" << endl;
 
 	  //noise reduction
-	  //Noise1 is a salt-and-pepper noise for which the median filter is best suited.
+	  //Noise1 is a salt-and-pepper noise for which the median filter is best suited, because
+	  //only few pixels are distorted. Applying an average filter would also distort the correct
+	  //pixels, which is the reason for this filter choice.
 	  noiseReduction(noise1, restorated1, "median", 7);
-	  //Noise2 is a gaussian noise for which one should use the average filter or the adaptive filter. The best results
-	  //could be achieved by using the adaptive filter.
-	  noiseReduction(noise2, restorated2, "adaptive", 5, 15);
+	  //Noise2 is a gaussian noise for which one should use the average filter or the adaptive filter.
+	  //That's because the noise distribution cancels out if one calculates the average, since the mean is
+	  //is 0. The best results could be achieved by using the adaptive filter.
+	  noiseReduction(noise2, restorated2, "average", 5, 15);
 	  
 	  // save images
 	  imwrite("restorated1.jpg", restorated1);
@@ -137,44 +138,6 @@ void noiseReduction(Mat& src, Mat& dst, const char* method, int kSize, int thres
   if (strcmp(method, "adaptive") == 0){
     adaptiveFilter(src, dst, kSize, thresh);
   }
-
-}
-
-void quicksort(float* data, int left, int right){
-	if(right-left == 1){
-		if(data[left] > data[right]){
-			float swap = data[left];
-			data[left] = data[right];
-			data[right] = swap;
-		}
-	}
-	else if(right-left > 1){
-		int l = left+1;
-		int r = right;
-		float pivot = data[left];
-
-		while(l< r){
-			while(data[l] < pivot && l < right){
-				l++;
-			}
-			while(data[r] >= pivot && r > left){
-				r--;
-			}
-
-			if(r > l){
-				float swap = data[r];
-				data[r] = data[l];
-				data[l] = swap;
-			}
-		}
-		if(r != left){
-			data[left] = data[r];
-			data[r] = pivot;
-		}
-
-		quicksort(data,left,r-1);
-		quicksort(data,r+1,right);
-	}
 
 }
 
@@ -219,34 +182,6 @@ void flip(Mat& src,Mat &dst){
 	}
 }
 
-/**
- * This function merges to matrices according to a mask.
- *
- * Input: Mat src1, src2, mask
- * Output: Mat dst
- *
- * (dst)ij = (mask)ij == 1 ? (src1)ij : (src2)ij
- */
-void mergeMats(Mat& src1, Mat& src2, Mat& mask, Mat&dst){
-	assert(src1.rows == src2.rows && src1.cols==src2.cols);
-	assert(src2.rows == mask.rows && src2.cols==mask.cols);
-	assert(mask.rows == dst.rows && mask.cols == mask.cols);
-
-	for(int row = 0; row < src1.rows; row++){
-		float*dstData = dst.ptr<float>(row);
-		float*src1Data = src1.ptr<float>(row);
-		float*src2Data = src2.ptr<float>(row);
-		float*maskData = mask.ptr<float>(row);
-		for(int col =0; col < src1.cols; col++){
-			if(maskData[col] == 1){
-				dstData[col] = src1Data[col];
-			}else{
-				dstData[col] = src2Data[col];
-			}
-		}
-	}
-}
-
 // the average filter
 // src: input image
 // dst: output image
@@ -261,19 +196,19 @@ void averageFilter(Mat& src, Mat& dst, int kSize){
 // src: input image
 // dst: output image
 // kSize: window size used by local average
-void adaptiveFilter(Mat& src, Mat& dst, int kSize, double thresh){
-	Mat avg3;
-	Mat avgn;
-	Mat mask(dst.rows,dst.cols,CV_32FC1);
-	dst.copyTo(avg3);
-	dst.copyTo(avgn);
-
-	averageFilter(src,avg3,REF_KERNELSIZE);
-	averageFilter(src,avgn,kSize);
-
-	threshold(abs(avg3-avgn),mask,thresh,1,THRESH_BINARY);
-
-	mergeMats(src,avgn,mask,dst);
+void adaptiveFilter(Mat& src, Mat& dst, int kSize, double threshold){
+	// Intermediate matrix to hold 3x3 average filtering result
+	Mat tmp(src.rows, src.cols, CV_32FC1);
+	// Create filtered images
+	averageFilter(src, tmp, REF_KERNELSIZE);
+	averageFilter(src, dst, kSize);
+	// Adaptively select larger filter if no edge
+	for(int y = 0; y < src.rows; y++) {
+		for(int x = 0; x < src.cols; x++) {
+			if(abs(dst.at<float>(y,x) - tmp.at<float>(y,x)) > threshold)
+				dst.at<float>(y,x) = src.at<float>(y,x);
+		}
+	}
 }
 
 // the median filter
@@ -281,69 +216,68 @@ void adaptiveFilter(Mat& src, Mat& dst, int kSize, double thresh){
 // dst: output image
 // kSize: window size used by median operation
 void medianFilter(Mat& src, Mat& dst, int kSize){
-	assert((kSize % 2) == 1);
-	float* data = new float[kSize*kSize];
-	int halfKS = kSize/2;
-	for(int row = 0; row < src.rows; row++){
-		float* rowData = dst.ptr<float>(row);
-		for(int col = 0; col < src.cols; col++){
-			int numData =0;
+	int cnt;
 
-			int startRow = MAX(0,row-halfKS);
-			int endRow = MIN(src.rows,row+halfKS+1);
-			int startCol = MAX(0,col-halfKS);
-			int endCol = MIN(src.cols,col+halfKS+1);
-
-			for(int krow =startRow; krow< endRow;krow++){
-				for(int kcol=startCol; kcol < endCol; kcol++){
-					data[numData++] = src.at<float>(krow,kcol);
+    for(int y = 0; y < src.rows; y++) {
+		for(int x = 0; x < src.cols; x++) {
+			cnt = 0;
+			vector<float> tmp;
+			for(int i = y-kSize/2; i <= y+kSize/2; i++)
+				for(int j = x-kSize/2; j <= x+kSize/2; j++) {
+					if(i > 0 && j > 0 && i < src.rows && j < src.cols) {
+						tmp.push_back(src.at<float>(i,j));
+						cnt++;
+					}
 				}
-			}
-
-			quicksort(data,0,numData-1);
-
-			rowData[col] = data[numData/2];
+			sort(tmp.begin(), tmp.end());
+			dst.at<float>(y,x) = tmp[cnt/2];
 		}
 	}
-	delete [] data;
+
 }
 
 void spatialConvolution(Mat& in, Mat& out, Mat& kernel){
-	assert((kernel.rows %2) == 1 && (kernel.cols%2) == 1);
-	flip(kernel,kernel);
-	int hks = kernel.rows/2;
+	Mat fkern;
+	float sum;
+	int ik, jk;
 
-	for(int row = 0; row < in.rows; row++){
-		float* dataRow = out.ptr<float>(row);
-		for(int col = 0; col < in.cols; col++){
-			float sum=0;
-			for(int krow = 0; krow < kernel.rows; krow++){
-				for(int kcol = 0; kcol < kernel.cols;kcol++){
-					int srow = row -hks + krow;
-					int scol = col-hks+kcol;
+	kernel.copyTo(fkern);
 
-					while(srow < 0){
-						srow += in.rows;
-					}
-					while(srow >= in.rows){
-						srow -= in.rows;
-					}
+    // First step: flip kernel about centre
+    flip(kernel, fkern);
 
-					while(scol < 0){
-						scol += in.cols;
-					}
 
-					while(scol >= in.cols){
-						scol -= in.cols;
+	// Now move across image and perform dot products
+	for(int y = 0; y < in.rows; y++) {
+		for(int x = 0;  x < in.cols; x++) {
+			sum = 0.0;
+			// Current pixel for filtering: (x,y)
+			for(int i = y-fkern.rows/2, ik = 0; i <= y+fkern.rows/2; i++, ik++)
+				for(int j = x-fkern.cols/2, jk = 0; j <= x+fkern.cols/2; j++, jk++){
+					int row = i;
+					int col = j;
+
+					while(row <0){
+						row += in.rows;
 					}
 
-					sum += in.at<float>(srow,scol)*kernel.at<float>(krow,kcol);
+					while(row >= in.rows){
+						row -= in.rows;
+					}
+
+					while(col < 0){
+						col += in.cols;
+					}
+
+					while(col >= in.cols){
+						col -= in.cols;
+					}
+
+					sum += in.at<float>(row,col)*fkern.at<float>(ik,jk);
 				}
-			}
-			dataRow[col] = sum;
+			out.at<float>(y,x) = sum;
 		}
 	}
-
 }
 
 // generates and saves different noisy versions of input image
