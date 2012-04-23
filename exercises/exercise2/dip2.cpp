@@ -1,6 +1,6 @@
 //============================================================================
 // Name        : dip2.cpp
-// Author      : Till Rohrmann
+// Author      : Ronny Haensch
 // Version     : 0.1
 // Copyright   : -
 // Description : load image using opencv, apply noise reduction, save images
