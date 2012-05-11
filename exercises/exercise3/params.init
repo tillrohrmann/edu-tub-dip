@@ -1,0 +1,37 @@
+# everything that starts with # is a comment
+# feel free to edit the values below
+
+# paths to load database images
+imgDBFile
+./BSDS300DB.info
+
+# paths to load query images
+queryFile
+./BSDS300DB.info
+
+# number of textons
+# you might play around with this value
+numberOfTextons
+10
+
+# file to save/load textons
+textonsFile
+./textons.txt
+
+# file to save/load database image descriptors
+databaseDescrFile
+./imgDB.desc
+
+# number of datapoints used during clustering
+numberOfDataPoints
+1000000
+
+# maximal number of images loaded from image database
+# you might wanna decrease this value for debugging purposes (speed)
+numberOfDBImages
+35
+
+# maximal number of query images
+# you might wanna decrease this value for debugging purposes (speed)
+numberOfQueryImages
+35
