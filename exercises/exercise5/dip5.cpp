@@ -143,7 +143,6 @@ Mat wienerFilter(Mat& degraded, Mat& filter, double snr){
 	Mat ft;
 	Mat ftFilter;
 	Mat original = Mat(degraded.rows,degraded.cols,CV_32FC2,Scalar(0,0));
-	Mat q = Mat(degraded.rows,degraded.cols,CV_32FC2,Scalar(0,0));
 	Mat result;
 
 	filter.copyTo(submatrix);
@@ -153,34 +152,13 @@ Mat wienerFilter(Mat& degraded, Mat& filter, double snr){
 	cv::dft(degraded,ft,DFT_COMPLEX_OUTPUT);
 	cv::dft(iFilter,ftFilter,DFT_COMPLEX_OUTPUT);
 
-	double max = 0;
-	for(int row =0; row < ftFilter.rows;row++){
-		for(int col = 0; col< ftFilter.cols;col++){
-			double length = ftFilter.at<Vec2f>(row,col)[0]*ftFilter.at<Vec2f>(row,col)[0] + ftFilter.at<Vec2f>(row,col)[1]*ftFilter.at<Vec2f>(row,col)[1];
-			if(length > max)
-				max = length;
-		}
-	}
-
-	max = sqrt(max);
-
 	for(int row =0; row < ft.rows;row++){
 		for(int col = 0; col < ft.cols; col++){
 			double length = ftFilter.at<Vec2f>(row,col)[0]*ftFilter.at<Vec2f>(row,col)[0] + ftFilter.at<Vec2f>(row,col)[1]*ftFilter.at<Vec2f>(row,col)[1];
-			if(sqrt(length) >= epsilon*max){
-				q.at<Vec2f>(row,col)[0] = ftFilter.at<Vec2f>(row,col)[0]/(length+1/snr/snr);
-				q.at<Vec2f>(row,col)[1] = -ftFilter.at<Vec2f>(row,col)[1]/(length+1/snr/snr);
-			}else{
-				q.at<Vec2f>(row,col)[0] = ftFilter.at<Vec2f>(row,col)[0]/(length+1/snr/snr);
-				q.at<Vec2f>(row,col)[1] = -ftFilter.at<Vec2f>(row,col)[1]/(length+1/snr/snr);
-			}
-		}
-	}
-
-	for(int row =0; row <ft.rows;row++){
-		for(int col =0; col < ft.cols; col++){
-			original.at<Vec2f>(row,col)[0] = q.at<Vec2f>(row,col)[0]*ft.at<Vec2f>(row,col)[0]-q.at<Vec2f>(row,col)[1]*ft.at<Vec2f>(row,col)[1];
-			original.at<Vec2f>(row,col)[1] = q.at<Vec2f>(row,col)[0]*ft.at<Vec2f>(row,col)[1]+q.at<Vec2f>(row,col)[1]*ft.at<Vec2f>(row,col)[0];
+			double a = ftFilter.at<Vec2f>(row,col)[0]/(length+1/snr/snr);
+			double b = -ftFilter.at<Vec2f>(row,col)[1]/(length+1/snr/snr);
+			original.at<Vec2f>(row,col)[0] = a*ft.at<Vec2f>(row,col)[0]-b*ft.at<Vec2f>(row,col)[1];
+			original.at<Vec2f>(row,col)[1] = a*ft.at<Vec2f>(row,col)[1]+b*ft.at<Vec2f>(row,col)[0];
 		}
 	}
 
