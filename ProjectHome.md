@@ -1,0 +1,1 @@
+Some stuff concerning digital image processing
